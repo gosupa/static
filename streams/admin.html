@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Supa Stream Monitoring</title>
+
+<style>
+  body { font-family: Arial; background:#0f172a; color:#fff; margin:0; }
+  .container { max-width:1100px; margin:auto; padding:20px; }
+  .card { background:#1e293b; padding:20px; border-radius:10px; }
+  input, select {
+    padding:10px; margin:8px 0;
+    border-radius:6px; border:none;
+  }
+  button {
+    padding:10px; border:none; border-radius:6px;
+    background:#3b82f6; color:#fff; cursor:pointer;
+  }
+  button.red { background:#ef4444; }
+  button.green { background:#22c55e; }
+  button:disabled { opacity:0.6; cursor:not-allowed; }
+
+  table { width:100%; margin-top:20px; border-collapse:collapse; }
+  th, td { padding:10px; border-bottom:1px solid #334155; }
+  th { background:#334155; }
+
+  .top-bar { display:flex; justify-content:space-between; align-items:center; }
+  .hidden { display:none; }
+  #loader { margin-top:15px; }
+  .error { color:#ef4444; margin-top:10px; }
+
+  #paginationBar {
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+
+  #paginationBar button {
+    background:#334155;
+  }
+
+  #paginationBar button:hover {
+    background:#475569;
+  }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"/>
+  <input id="password" type="password" placeholder="Password"/>
+  <button id="loginBtn" onclick="login()">Login</button>
+  <div id="loginError" class="error"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+  <div class="top-bar">
+    <h2>Streams Dashboard</h2>
+    <label>
+      Auto Refresh <input type="checkbox" id="autoRefresh" checked/>
+    </label>
+  </div>
+
+  <div id="loader" class="hidden">Loading...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>StreamKey</th>
+        <th>ViewKey</th>
+        <th>ViewURL</th>
+        <th>Health</th>
+        <th>LastSeenAt</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <!-- PAGINATION -->
+  <div id="paginationBar">
+
+    <div>
+      Page Size:
+      <select id="pageSize" onchange="onPageSizeChange()">
+        <option value="10">10</option>
+        <option value="20" selected>20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button onclick="prevPage()">Prev</button>
+      <span id="pageInfo">Page 1 / 1</span>
+      <button onclick="nextPage()">Next</button>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<script>
+const API_HOST = "https://live-stream-service.external.gosupa.org:8080";
+
+let token = "";
+let interval = null;
+
+let currentPage = 1;
+let totalPages = 1;
+
+// ---------------- LOGIN ----------------
+async function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const btn = document.getElementById("loginBtn");
+
+  btn.disabled = true;
+  btn.innerText = "Logging in...";
+  clearLoginError();
+
+  try {
+    const params = new URLSearchParams();
+    params.append("email", email);
+    params.append("password", password);
+
+    const res = await fetch(API_HOST + "/dashboard/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!res.ok) throw new Error("Invalid credentials");
+
+    const data = await res.json();
+    if (!data.token) throw new Error("No token received");
+
+    token = data.token;
+
+    document.getElementById("loginCard").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+
+    fetchStreams();
+    startAutoRefresh();
+
+  } catch (e) {
+    showLoginError(e.message);
+  }
+
+  btn.disabled = false;
+  btn.innerText = "Login";
+}
+
+// ---------------- FETCH ----------------
+async function fetchStreams() {
+  const pageSize = document.getElementById("pageSize").value;
+
+  document.getElementById("loader").classList.remove("hidden");
+
+  try {
+    const res = await fetch(
+      `${API_HOST}/dashboard/streams?page_number=${currentPage}&page_size=${pageSize}`,
+      {
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      }
+    );
+
+    if (!res.ok) throw new Error("Fetch failed");
+
+    const data = await res.json();
+
+    totalPages = Number(data.total_pages || 1);
+    currentPage = Number(data.page_number || 1);
+
+    renderTable(data.streams);
+    updatePaginationUI();
+
+  } catch (e) {
+    console.error(e);
+  }
+
+  document.getElementById("loader").classList.add("hidden");
+}
+
+// ---------------- TABLE ----------------
+function renderTable(streams) {
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+
+  streams.forEach(s => {
+    const health = s.last_seen_at > 0 ? "Healthy" : "Dead";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${s.stream_id}</td>
+      <td>${s.viewer_id}</td>
+      <td>https://viewer/${s.viewer_id}</td>
+      <td>${health}</td>
+      <td>${formatTime(s.last_seen_at)}</td>
+      <td>
+        ${s.blocked
+          ? `<button class="green" onclick="unblock('${s.stream_id}')">Unblock</button>`
+          : `<button class="red" onclick="block('${s.stream_id}')">Block</button>`
+        }
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------- ACTIONS ----------------
+async function block(id) {
+  const params = new URLSearchParams();
+  params.append("stream_id", id);
+
+  await fetch(API_HOST + "/dashboard/block", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params
+  });
+
+  fetchStreams();
+}
+
+async function unblock(id) {
+  const params = new URLSearchParams();
+  params.append("stream_id", id);
+
+  await fetch(API_HOST + "/dashboard/unblock", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params
+  });
+
+  fetchStreams();
+}
+
+// ---------------- PAGINATION ----------------
+function updatePaginationUI() {
+  document.getElementById("pageInfo").innerText =
+    `Page ${currentPage} / ${totalPages}`;
+}
+
+function nextPage() {
+  if (currentPage < totalPages) {
+    currentPage++;
+    fetchStreams();
+  }
+}
+
+function prevPage() {
+  if (currentPage > 1) {
+    currentPage--;
+    fetchStreams();
+  }
+}
+
+function onPageSizeChange() {
+  currentPage = 1;
+  fetchStreams();
+}
+
+// ---------------- HELPERS ----------------
+function formatTime(ts) {
+  if (!ts) return "-";
+  return new Date(Number(ts)).toLocaleString();
+}
+
+function showLoginError(msg) {
+  document.getElementById("loginError").innerText = msg;
+}
+
+function clearLoginError() {
+  document.getElementById("loginError").innerText = "";
+}
+
+// ---------------- AUTO REFRESH ----------------
+function startAutoRefresh() {
+  interval = setInterval(() => {
+    if (document.getElementById("autoRefresh").checked) {
+      fetchStreams();
+    }
+  }, 10000);
+}
+</script>
+
+</body>
+</html>
