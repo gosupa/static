@@ -46,9 +46,6 @@
 					} else if (type === 'radio') {
 						playlist = 'audio.m3u8';
 					}
-					type = 'tv';
-					viewerId = '442598c6-6a35-11f1-92a5-ce4f3d067d8b';
-					playlist = 'master.m3u8';
     				window.START_HLS_PLAYER(`https://cdn-redirection-service.external.gosupa.org:8080/streams/${type}/${viewerId}/${playlist}`);
   				} else {
     				waitForHlsPlayer((playerFn) => {
