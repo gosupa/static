@@ -39,7 +39,14 @@
 
 			window.addEventListener('load', () => {
 			  	if (typeof window.START_HLS_PLAYER === 'function') {
-    				window.START_HLS_PLAYER("https://cdn-prod.supareels.io/streams/tv/47ac71a8-4ddb-11f1-b1cb-ea100e442d41/master.m3u8");
+					const [type, viewerId] = window.location.hash.substring(1).split('/');
+					var playlist = 'index.m3u8';
+					if (type === 'tv') {
+						playlist = 'master.m3u8';
+					} else if (type === 'radio') {
+						playlist = 'audio.m3u8';
+					}
+    				window.START_HLS_PLAYER(`https://cdn-redirection-service.external.gosupa.org:8080/streams/${type}/${viewerId}/${playlist}`);
   				} else {
     				waitForHlsPlayer((playerFn) => {
       					playerFn();
