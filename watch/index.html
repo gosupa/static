@@ -2,7 +2,7 @@
 <html lang="en">
    <!-- Mirrored from livepush.io/hls-player/index.html by HTTrack Website Copier/3.x [XR&CO'2014], Sun, 14 Jun 2026 16:11:18 GMT -->
    <head>
-      <link rel="stylesheet" href="tools.css">
+      <link rel="stylesheet" href="styles/tools.css">
    </head>
    <body>
       <div class="header section_wrap" style="height:auto;justify-content:flex-start;">
@@ -16,11 +16,11 @@
          </div>
       </div>
 
-      <link rel="stylesheet" href="player.css">
-      <link href="video-js.min.css" rel="stylesheet">
-      <link href="index.css" rel="stylesheet">
-      <link rel="stylesheet" href="hls-player.css">
-      <script src="player.js"></script>
+      <link rel="stylesheet" href="styles/player.css">
+      <link href="styles/video-js.min.css" rel="stylesheet">
+      <link href="styles/index.css" rel="stylesheet">
+      <link rel="stylesheet" href="styles/hls-player.css">
+      <script src="scripts/player.js"></script>
 
 	  <script>
 		function waitForHlsPlayer(callback, timeout = 10000) {
@@ -46,6 +46,9 @@
 					} else if (type === 'radio') {
 						playlist = 'audio.m3u8';
 					}
+					// type = "tv";
+					// viewerId = "442598c6-6a35-11f1-92a5-ce4f3d067d8b";
+					// playlist = "master.m3u8";
     				window.START_HLS_PLAYER(`https://cdn-redirection-service.external.gosupa.org:8080/streams/${type}/${viewerId}/${playlist}`);
   				} else {
     				waitForHlsPlayer((playerFn) => {
