@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dailymotion Player</title>
+</head>
+<body>
+
+  <div
+    id="dailymotion-player"
+    style="width: 100%; max-width: 900px; aspect-ratio: 16/9;">
+  </div>
+
+  <script src="https://geo.dailymotion.com/player/x1njeq.js"></script>
+
+  <script>
+    dailymotion
+      .createPlayer("dailymotion-player", {
+        video: "xbbcype"
+      })
+      .then((player) => {
+        console.log("Player loaded", player);
+      })
+      .catch((error) => {
+        console.error("Player error", error);
+      });
+  </script>
+
+</body>
+</html>
